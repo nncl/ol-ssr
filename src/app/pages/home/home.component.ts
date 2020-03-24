@@ -32,6 +32,7 @@ export class HomeComponent implements OnInit {
     for (let i = 0; i < count; ++i) {
       const coordinates = [2 * e * Math.random() - e, 2 * e * Math.random() - e];
       features[i] = new Feature(new Point(coordinates));
+      features[i].attributes = {date: new Date()};
     }
 
     this.source = new VectorSource({
@@ -91,14 +92,14 @@ export class HomeComponent implements OnInit {
 
         const items = feature.get('features');
         if (items.length > 1) {
-
           const extent = createEmpty();
           items.forEach((item) => {
             extend(extent, item.getGeometry().getExtent());
           });
-
           this.center(extent);
-
+        } else {
+          const item = items[0];
+          console.log(item.attributes?.date);
         }
 
       }
