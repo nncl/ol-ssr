@@ -1,7 +1,13 @@
 import { Component, Inject, OnInit, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 
-declare let ol: any;
+import Feature from 'ol/Feature';
+import Map from 'ol/Map';
+import { createEmpty, extend } from 'ol/extent';
+import Point from 'ol/geom/Point';
+import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer';
+import { Cluster, OSM, Vector as VectorSource } from 'ol/source';
+import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 
 @Component({
   selector: 'app-home',
@@ -9,9 +15,8 @@ declare let ol: any;
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit {
-  lat = -23.742391;
-  lng = -46.527745;
   map: any;
+  source: any;
   isBrowser: boolean;
 
   constructor(@Inject(PLATFORM_ID) platformId: object) {
@@ -19,42 +24,91 @@ export class HomeComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (!this.isBrowser) {
-      return;
+    const distance = {value: 40};
+
+    const count = 200;
+    const features = new Array(count);
+    const e = 4500000;
+    for (let i = 0; i < count; ++i) {
+      const coordinates = [2 * e * Math.random() - e, 2 * e * Math.random() - e];
+      features[i] = new Feature(new Point(coordinates));
     }
 
-    const marker = new ol.Feature({
-      geometry: new ol.geom.Point(ol.proj.fromLonLat([this.lng, this.lat]))
+    this.source = new VectorSource({
+      features
     });
 
-    marker.setStyle(new ol.style.Style({
-      image: new ol.style.Icon({
-        crossOrigin: 'anonymous',
-        src: '/assets/marker.png'
-      })
-    }));
-
-    const vectorSource = new ol.source.Vector({
-      features: [marker]
+    const clusterSource = new Cluster({
+      distance: distance.value,
+      source: this.source
     });
 
-    const vectorLayer = new ol.layer.Vector({
-      source: vectorSource
+    const styleCache = {};
+    const clusters = new VectorLayer({
+      source: clusterSource,
+      style: (feature) => {
+        const size = feature.get('features').length;
+        let style = styleCache[size];
+        if (!style) {
+          style = new Style({
+            image: new CircleStyle({
+              radius: 10,
+              stroke: new Stroke({
+                color: '#fff'
+              }),
+              fill: new Fill({
+                color: '#3399CC'
+              })
+            }),
+            text: new Text({
+              text: size.toString(),
+              fill: new Fill({
+                color: '#fff'
+              })
+            })
+          });
+          styleCache[size] = style;
+        }
+        return style;
+      }
     });
 
-    this.map = new ol.Map({
-      target: 'map',
-      layers: [
-        new ol.layer.Tile({
-          source: new ol.source.OSM()
-        }),
-        vectorLayer
-      ],
-      view: new ol.View({
-        center: ol.proj.fromLonLat([this.lng, this.lat]),
-        zoom: 15,
-      })
+    const raster = new TileLayer({
+      source: new OSM()
     });
+
+    this.map = new Map({
+      layers: [raster, clusters],
+      target: 'map'
+    });
+
+    this.map.on('click', (evt: any) => {
+      const feature = this.map.forEachFeatureAtPixel(evt.pixel, item => {
+        return item;
+      });
+
+      if (feature) {
+
+        const items = feature.get('features');
+        if (features.length > 1) {
+
+          const extent = createEmpty();
+          items.forEach((item) => {
+            extend(extent, item.getGeometry().getExtent());
+          });
+
+          this.center(extent);
+
+        }
+
+      }
+    });
+
+    this.center();
+  }
+
+  center(extent?) {
+    this.map.getView().fit(extent ? extent : this.source.getExtent(), {maxZoom: 16, padding: [24, 24, 24, 24]});
   }
 
 }
