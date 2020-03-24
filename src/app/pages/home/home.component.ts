@@ -90,7 +90,7 @@ export class HomeComponent implements OnInit {
       if (feature) {
 
         const items = feature.get('features');
-        if (features.length > 1) {
+        if (items.length > 1) {
 
           const extent = createEmpty();
           items.forEach((item) => {
